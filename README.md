@@ -1,0 +1,1 @@
+This IRC implementation is for Internetworking Protocols Fall 2017 class at Portland State University.
