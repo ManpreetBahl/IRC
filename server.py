@@ -2,6 +2,7 @@ import socket
 import sys
 import threading
 import select
+import CONSTANTS
 
 #Defines an IRC Room
 class IRCRoom():
@@ -79,7 +80,7 @@ class IRCServer(threading.Thread):
         self.serverSocket.close()
 
 def main():
-    server = IRCServer('127.0.0.1', 10000)
+    server = IRCServer(CONSTANTS.HOST, CONSTANTS.PORT)
     server.start()
 
 if __name__ == "__main__":
