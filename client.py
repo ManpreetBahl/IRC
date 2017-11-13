@@ -18,6 +18,7 @@ while True:
     for s in read:
         if s is server_connection:
             #TODO: need to handle server response here
+            print("Hello")
             # message = s.recv(1024)
             # if not message:
             #     print("No data from server")

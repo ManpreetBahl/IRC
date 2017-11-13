@@ -8,7 +8,7 @@ import CONSTANTS
 class IRCRoom():
     def __init__(self, name):
         self.name = name #Name of the room
-        self.roomClients = set() #Set containing list of clients in that room
+        self.roomClients = set() #Set containing a list of clients in that room. Set allows for only unique clients
 
 
 #Defines the IRC Server
@@ -17,25 +17,29 @@ class IRCServer(threading.Thread):
         threading.Thread.__init__(self)
         self.host = host
         self.port = port
-        self.clients = [] #List containing all clients connected to the server
-        self.testRoom = IRCRoom('Room') #One room for now #TODO: Support dynamic room operations
+        self.clients = [] #List containing all clients connected to the server. Can also be a set. Decide later
+        self.rooms = [] #List containing all rooms on the server. Can also be a set. Decide later
 
     def run(self):
         #Create and bind socket to host and port
         self.serverSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.serverSocket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.serverSocket.bind((self.host, self.port))
-        #TODO: Check if socket already exists before adding
-        self.clients.append(self.serverSocket) #Add server socket to list
 
-        self.clients.append(sys.stdin); #NEEDED TO CONNECT TO SERVER WITH TELNET
+        #Check if server socket is in the clients list or not
+        if(self.serverSocket in self.clients):
+            print("Server is alredy active and running!")
+            sys.exit(1)
+        else:
+            self.clients.append(self.serverSocket) #Add server socket to list
 
         self.serverSocket.listen(1)
 
         while True:
             try:
                 read, write, error = select.select(self.clients, [], [])
-            except socket.error:
+            except socket.error as msg:
+                #print("Socket Error: " + str(msg))
                 continue
 
             for s in read:
@@ -43,41 +47,46 @@ class IRCServer(threading.Thread):
                 if s == self.serverSocket:
                     try:
                         clientSocket, clientAddr = self.serverSocket.accept()
-                        print("ClientSocket: " + str(clientSocket) + " ClientAddr: " + str(clientAddr))
                     except socket.error:
                         break
-                    #TODO: Check if client already exists in list of connected client
-                    self.clients.append(clientSocket)
-                    self.testRoom.roomClients.add(clientSocket)
-
-                elif s == sys.stdin: #For testing with telnet
-                    data = sys.stdin.readline()
-                    print("Data is: " + data)
-                    if data:
-                        # Send message to everyone in the client (including the person sending it)
-                        for person in self.testRoom.roomClients:
-                            person.send(data)
-
+                    #If client is already connected to the server, send an appropriate message
+                    if(clientSocket in self.clients):
+                        clientSocket.send("You are already connected to the server!")
+                    else:
+                        # Add to list of all connected clients
+                        self.clients.append(clientSocket)
                 else:
                     try:
                         data = s.recv(1024)
-                        print("Data Received: " + data + '\n')
-                        if data:
-                            #Send message to everyone in the client (including the person sending it)
-                            for person in self.testRoom.roomClients:
-                                person.send(data)
+                        print("Data Received: " + str(data))
 
-                    except:
+                        if data:
+
+                            # TODO: Message parsing.
+                            """
+                            #Initial Message Parsing
+                            command = data.split(' ', 1)[0]
+                            print("Command: " + repr(command))
+                            if command == "/LIST":
+                                s.send("YOU SENT A LIST COMMAND!")
+                            """
+
+                            #Send message to everyone else connected to the server
+                            for person in self.clients:
+                                if(person != self.serverSocket and person != s):
+                                    person.send(data)
+
+                    except Exception as e:
                         #Disconnect client from server and remove from connected clients list
+                        print("ERROR: " + str(e))
                         s.close()
                         self.clients.remove(s)
 
-                        #For now:
-                        self.testRoom.roomClients.remove(s)
+                        #TODO: Remove person from all rooms here
 
                         continue
 
-        self.serverSocket.close()
+        self.serverSocket.close() #Technically, unreachable code. Leaving it here for now
 
 def main():
     server = IRCServer(CONSTANTS.HOST, CONSTANTS.PORT)
