@@ -17,15 +17,13 @@ while True:
     read, write, error = select.select(socket_list, [], [])
     for s in read:
         if s is server_connection:
-            #TODO: need to handle server response here
-            print("Hello")
-            # message = s.recv(1024)
-            # if not message:
-            #     print("No data from server")
-            #     sys.exit(2)
-            # else:
-            #     sys.stdout.write(message.decode())
+            # Get server response and display
+             message = s.recv(1024)
+             if not message:
+                 print("Server Down")
+                 sys.exit(2)
+             else:
+                 sys.stdout.write(message.decode())
         else:
             message = sys.stdin.readline()
-            print("Sending message")
             server_connection.sendall(message.encode())

@@ -60,8 +60,12 @@ class IRCServer(threading.Thread):
                         data = s.recv(1024)
                         print("Data Received: " + str(data))
 
-                        if data:
-
+                        if not data:
+                            # Handles the unexpected connection closed by client
+                            s.close()
+                            self.clients.remove(s)
+                            print("Connection closed by client")
+                        else:
                             # TODO: Message parsing.
                             """
                             #Initial Message Parsing
