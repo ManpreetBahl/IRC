@@ -3,6 +3,7 @@ import sys
 import threading
 import select
 import CONSTANTS
+import json
 
 #Defines an IRC Room
 class IRCRoom():
@@ -58,7 +59,7 @@ class IRCServer(threading.Thread):
                 else:
                     try:
                         data = s.recv(1024)
-                        print("Data Received: " + str(data))
+                        print("Data Received: " + str(data.decode("UTF-8")))
 
                         if not data:
                             # Handles the unexpected connection closed by client
@@ -67,6 +68,13 @@ class IRCServer(threading.Thread):
                             print("Connection closed by client")
                         else:
                             # TODO: Message parsing.
+
+                            """Initial JSON parsing
+                            print("Parsing JSON...")
+                            jsonData = json.loads(str(data.decode('UTF-8')))
+                            print(jsonData["command"])
+                            """
+
                             """
                             #Initial Message Parsing
                             command = data.split(' ', 1)[0]

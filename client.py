@@ -3,6 +3,7 @@ import sys
 import threading
 import select
 import CONSTANTS
+import json
 
 # client establishes connection to the server
 print("Connecting to server...\n")
@@ -26,4 +27,9 @@ while True:
                  sys.stdout.write(message.decode())
         else:
             message = sys.stdin.readline()
-            server_connection.sendall(message.encode())
+            #server_connection.sendall(message.encode())
+
+            serverMsg = {}
+            serverMsg["command"] = message.replace("\n", "")
+            print(serverMsg)
+            server_connection.sendall((json.dumps(serverMsg)).encode("UTF-8"))
