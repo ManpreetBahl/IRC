@@ -68,25 +68,32 @@ class IRCServer(threading.Thread):
                             print("Connection closed by client")
                         else:
                             # TODO: Message parsing.
+                            jsonData = json.loads(str(data.decode('UTF-8')))
+                            command = jsonData["command"]
+
+                            if command == "LISTROOMS": #Client wants a list of all active rooms
+                                if self.rooms:
+                                    s.send( ("Available Rooms:\n" + "\n\t".join(self.rooms)).encode("UTF-8") )
+                                else:
+                                    s.send( ("No avaiable rooms\n").encode("UTF-8") )
 
                             """Initial JSON parsing
                             print("Parsing JSON...")
                             jsonData = json.loads(str(data.decode('UTF-8')))
                             print(jsonData["command"])
-                            """
 
-                            """
                             #Initial Message Parsing
                             command = data.split(' ', 1)[0]
                             print("Command: " + repr(command))
                             if command == "/LIST":
                                 s.send("YOU SENT A LIST COMMAND!")
-                            """
+                            
 
                             #Send message to everyone else connected to the server
                             for person in self.clients:
                                 if(person != self.serverSocket and person != s):
                                     person.send(data)
+                            """
 
                     except Exception as e:
                         #Disconnect client from server and remove from connected clients list

@@ -4,7 +4,61 @@ import threading
 import select
 import CONSTANTS
 import json
+import os
 
+def printMenu():
+    print(30 * "-", "MENU", 30 * "-")
+    print("1. List IRC Rooms")
+    print("2. Exit")
+    print(66 * "-")
+
+
+print("Connecting to server...")
+server_connection = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+server_connection.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+server_connection.connect((CONSTANTS.HOST, CONSTANTS.PORT))
+print("Connected")
+
+printMenu()
+
+socket_list = [sys.stdin, server_connection]
+
+while True:
+    read, write, error = select.select(socket_list, [], [])
+    for s in read:
+        if s is server_connection:
+            # Get server response and display
+             message = s.recv(1024)
+             if not message:
+                 print("Server Down")
+                 sys.exit(1)
+             else:
+                 sys.stdout.write("SERVER RESPONSE: " + message.decode())
+        else:
+            #printMenu()
+            choice = input("Enter your choice [1-2]: ")
+
+            if choice == "1": #Get a list of all rooms on IRC Server
+                serverMsg = {}
+                serverMsg["command"] = "LISTROOMS"
+                server_connection.sendall((json.dumps(serverMsg)).encode("UTF-8"))
+            elif choice == "2": 
+                print("Terminating program...")
+                sys.exit(0)
+        
+
+            #message = sys.stdin.readline()
+            #server_connection.sendall(message.encode())
+
+            """
+            serverMsg = {}
+            serverMsg["command"] = message.replace("\n", "")
+            print(serverMsg)
+            server_connection.sendall((json.dumps(serverMsg)).encode("UTF-8"))
+            """
+
+
+""" For Backup Purposes
 # client establishes connection to the server
 print("Connecting to server...\n")
 server_connection = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -33,3 +87,4 @@ while True:
             serverMsg["command"] = message.replace("\n", "")
             print(serverMsg)
             server_connection.sendall((json.dumps(serverMsg)).encode("UTF-8"))
+"""
