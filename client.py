@@ -12,7 +12,54 @@ def printMenu():
     print("2. Exit")
     print(66 * "-")
 
+class IRCClient():
+    def __init__(self, name):
+        self.name = name
+        self.server_connection = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.server_connection.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self.server_connection.connect((CONSTANTS.HOST, CONSTANTS.PORT))
+        print("Connected to Server!")
 
+    def listRooms(self):
+        serverMsg = {}
+        serverMsg["command"] = "LISTROOMS"
+        self.server_connection.send((json.dumps(serverMsg)).encode("UTF-8"))
+
+    def run(self):
+        socket_list = [sys.stdin, self.server_connection]
+        while True:
+            read, write, error = select.select(socket_list, [], [])
+            for s in read:
+                if s is self.server_connection:
+                    # Get server response and display
+                    message = s.recv(1024)
+                    if not message:
+                        print("Server Down")
+                        sys.exit(1)
+                    else:
+                        print("SERVER RESPONSE: " + message.decode())
+
+                elif s is sys.stdin:
+                    message = sys.stdin.readline().replace("\n", "")
+                    command = message.split(" ", 1)[0]
+
+                    if command == "LISTROOMS":
+                        self.listRooms()
+
+                    elif command == "QUIT":
+                        print("Terminating program...")
+                        self.server_connection.close()
+                        sys.exit(0)
+
+def main():
+    client = IRCClient("Manpreet")
+    client.run()
+
+if __name__ == "__main__":
+    main()
+
+
+"""
 print("Connecting to server...")
 server_connection = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 server_connection.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -33,9 +80,10 @@ while True:
                  print("Server Down")
                  sys.exit(1)
              else:
-                 sys.stdout.write("SERVER RESPONSE: " + message.decode())
+                 print("SERVER RESPONSE: " + message.decode())
         else:
             #printMenu()
+            printMenu()
             choice = input("Enter your choice [1-2]: ")
 
             if choice == "1": #Get a list of all rooms on IRC Server
@@ -44,18 +92,20 @@ while True:
                 server_connection.sendall((json.dumps(serverMsg)).encode("UTF-8"))
             elif choice == "2": 
                 print("Terminating program...")
+                server_connection.close()
                 sys.exit(0)
         
 
             #message = sys.stdin.readline()
             #server_connection.sendall(message.encode())
-
             """
+
+"""
             serverMsg = {}
             serverMsg["command"] = message.replace("\n", "")
             print(serverMsg)
             server_connection.sendall((json.dumps(serverMsg)).encode("UTF-8"))
-            """
+"""
 
 
 """ For Backup Purposes
