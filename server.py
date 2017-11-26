@@ -9,7 +9,7 @@ import json
 class IRCRoom():
     def __init__(self, name):
         self.name = name #Name of the room
-        self.roomClients = set() #Set containing a list of clients in that room. Set allows for only unique clients
+        self.roomClients = {} #Dictionary containing all clients that are part of the room
 
 
 #Defines the IRC Server
@@ -18,9 +18,11 @@ class IRCServer(threading.Thread):
         threading.Thread.__init__(self)
         self.host = host
         self.port = port
-        self.clients = [] #List containing all clients connected to the server. Can also be a set. Decide later
-        self.rooms = [] #List containing all rooms on the server. Can also be a set. Decide later
-
+        #Dictionay containing all clients connected to the server. Key: Socket Object. Value: Client name associated with the socket object
+        self.clients = {}
+        #List containing all rooms on the server. Can also be a set. Decide later
+        self.rooms = []
+    
     def run(self):
         #Create and bind socket to host and port
         self.serverSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -28,17 +30,18 @@ class IRCServer(threading.Thread):
         self.serverSocket.bind((self.host, self.port))
 
         #Check if server socket is in the clients list or not
-        if(self.serverSocket in self.clients):
+        if("SERVER" in self.clients):
             print("Server is alredy active and running!")
             sys.exit(1)
         else:
-            self.clients.append(self.serverSocket) #Add server socket to list
+            #Add server socket to dictionary
+            self.clients[self.serverSocket] = "SERVER"
 
         self.serverSocket.listen(1)
 
         while True:
             try:
-                read, write, error = select.select(self.clients, [], [])
+                read, write, error = select.select(list(self.clients.keys()), [], [])
             except socket.error as msg:
                 #print("Socket Error: " + str(msg))
                 continue
@@ -55,7 +58,7 @@ class IRCServer(threading.Thread):
                         clientSocket.send("You are already connected to the server!")
                     else:
                         # Add to list of all connected clients
-                        self.clients.append(clientSocket)
+                        self.clients[clientSocket] = clientSocket
                 else:
                     try:
                         data = s.recv(1024)
@@ -64,42 +67,49 @@ class IRCServer(threading.Thread):
                         if not data:
                             # Handles the unexpected connection closed by client
                             s.close()
-                            self.clients.remove(s)
+                            del self.clients[s]
                             print("Connection closed by client")
                         else:
-                            # TODO: Message parsing.
                             jsonData = json.loads(str(data.decode('UTF-8')))
                             command = jsonData["command"]
 
-                            if command == "LISTROOMS": #Client wants a list of all active rooms
+                            # Associate client name to socket object
+                            if command == "NICK":
+                                self.clients[s] = jsonData["name"]
+
+                            #Client wants a list of all active rooms
+                            elif command == "LISTROOMS":
                                 if self.rooms:
-                                    s.send( ("Available Rooms:\n" + "\n\t".join(self.rooms)).encode("UTF-8") )
+                                    message = ""
+                                    for room in self.rooms:
+                                        message += "\n\t" + room.name
+
+                                    s.send( ("<" + self.clients[self.serverSocket] + "> Available Rooms:" + message).encode("UTF-8") )
                                 else:
-                                    s.send( ("No avaiable rooms\n").encode("UTF-8") )
+                                    s.send( ("<" + self.clients[self.serverSocket] + "> No avaiable rooms").encode("UTF-8") )
 
-                            """Initial JSON parsing
-                            print("Parsing JSON...")
-                            jsonData = json.loads(str(data.decode('UTF-8')))
-                            print(jsonData["command"])
+                            #Client wants to create a room
+                            elif command == "CREATEROOM":
+                                if jsonData["roomname"] in self.rooms: #Check to make sure room name is not taken
+                                    s.send( ("<" + self.clients[self.serverSocket] + "> Room name already taken! Please enter a different room name!").encode("UTF-8") )
+                                else:
+                                    #Create new room with the given room name
+                                    newRoom = IRCRoom(jsonData["roomname"])                                   
 
-                            #Initial Message Parsing
-                            command = data.split(' ', 1)[0]
-                            print("Command: " + repr(command))
-                            if command == "/LIST":
-                                s.send("YOU SENT A LIST COMMAND!")
-                            
+                                    #Add the client to the room list
+                                    newRoom.roomClients[s] = self.clients[s]
+                                    
+                                    #Add room to list of rooms
+                                    self.rooms.append(newRoom)
 
-                            #Send message to everyone else connected to the server
-                            for person in self.clients:
-                                if(person != self.serverSocket and person != s):
-                                    person.send(data)
-                            """
+                                    #Send message to client
+                                    s.send( ("<" + self.clients[self.serverSocket] + "> Room created succesfully! You have been added to the room!").encode("UTF-8") )
 
                     except Exception as e:
                         #Disconnect client from server and remove from connected clients list
                         print("ERROR: " + str(e))
                         s.close()
-                        self.clients.remove(s)
+                        del self.clients[s]
 
                         #TODO: Remove person from all rooms here
 

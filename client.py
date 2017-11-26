@@ -18,15 +18,30 @@ class IRCClient():
         self.server_connection = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.server_connection.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.server_connection.connect((CONSTANTS.HOST, CONSTANTS.PORT))
+        serverMsg = {}
+        serverMsg["command"] = "NICK"
+        serverMsg["name"] = self.name
+        self.server_connection.send((json.dumps(serverMsg)).encode("UTF-8"))
         print("Connected to Server!")
 
+    def prompt(self):
+        sys.stdout.write("<" + self.name + "> ")
+        sys.stdout.flush()
+ 
     def listRooms(self):
         serverMsg = {}
         serverMsg["command"] = "LISTROOMS"
         self.server_connection.send((json.dumps(serverMsg)).encode("UTF-8"))
 
+    def createRoom(self, roomName):
+        serverMsg = {}
+        serverMsg["command"] = "CREATEROOM"
+        serverMsg["roomname"] = roomName
+        self.server_connection.send((json.dumps(serverMsg)).encode("UTF-8"))
+
     def run(self):
         socket_list = [sys.stdin, self.server_connection]
+        self.prompt()
         while True:
             read, write, error = select.select(socket_list, [], [])
             for s in read:
@@ -37,7 +52,8 @@ class IRCClient():
                         print("Server Down")
                         sys.exit(1)
                     else:
-                        print("SERVER RESPONSE: " + message.decode())
+                        print(message.decode())
+                        self.prompt()
 
                 elif s is sys.stdin:
                     message = sys.stdin.readline().replace("\n", "")
@@ -46,13 +62,18 @@ class IRCClient():
                     if command == "LISTROOMS":
                         self.listRooms()
 
+                    elif command == "CREATEROOM":
+                        roomName = message.split(" ", 1)[1]
+                        self.createRoom(roomName)
+
                     elif command == "QUIT":
                         print("Terminating program...")
                         self.server_connection.close()
                         sys.exit(0)
 
 def main():
-    client = IRCClient("Manpreet")
+    name = input("Please enter your name: ")
+    client = IRCClient(name)
     client.run()
 
 if __name__ == "__main__":
