@@ -39,6 +39,12 @@ class IRCClient():
         serverMsg["roomname"] = roomName
         self.server_connection.send((json.dumps(serverMsg)).encode("UTF-8"))
 
+    def joinRoom(self, roomName):
+        serverMsg = {}
+        serverMsg["command"] = "JOINROOM"
+        serverMsg["roomname"] = roomName
+        self.server_connection.send((json.dumps(serverMsg)).encode("UTF-8"))
+
     def run(self):
         socket_list = [sys.stdin, self.server_connection]
         self.prompt()
@@ -65,6 +71,10 @@ class IRCClient():
                     elif command == "CREATEROOM":
                         roomName = message.split(" ", 1)[1]
                         self.createRoom(roomName)
+
+                    elif command == "JOINROOM":
+                        roomName = message.split(" ", 1)[1]
+                        self.joinRoom(roomName)
 
                     elif command == "QUIT":
                         print("Terminating program...")

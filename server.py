@@ -90,9 +90,15 @@ class IRCServer(threading.Thread):
 
                             #Client wants to create a room
                             elif command == "CREATEROOM":
-                                if jsonData["roomname"] in self.rooms: #Check to make sure room name is not taken
-                                    s.send( ("<" + self.clients[self.serverSocket] + "> Room name already taken! Please enter a different room name!").encode("UTF-8") )
-                                else:
+                                
+                                allowCreate = True
+                                for room in self.rooms:
+                                    if jsonData["roomname"] == room.name:
+                                        allowCreate = False
+                                        s.send( ("<" + self.clients[self.serverSocket] + "> Room name already taken! Please enter a different room name!").encode("UTF-8") )
+                                        break
+
+                                if allowCreate == True:
                                     #Create new room with the given room name
                                     newRoom = IRCRoom(jsonData["roomname"])                                   
 
@@ -104,6 +110,26 @@ class IRCServer(threading.Thread):
 
                                     #Send message to client
                                     s.send( ("<" + self.clients[self.serverSocket] + "> Room created succesfully! You have been added to the room!").encode("UTF-8") )
+
+                            elif command == "JOINROOM":
+                                success = False
+                                #Add the client to a room if it exists
+                                for room in self.rooms:
+                                    if jsonData["roomname"] == room.name:
+                                        #Add user to the room if it exists
+                                        room.roomClients[s] = self.clients[s]
+                                        
+                                        #Notify other members in the room about new client joining
+                                        for userSocket in room.roomClients:
+                                            if userSocket != s:
+                                                userSocket.send( ("<" + room.name + "> " + self.clients[s] + " has joined the room!").encode("UTF-8") )
+                                        
+                                        success = True
+                                        break
+                                if success == False:
+                                    s.send( ("<" + self.clients[self.serverSocket] + "> Unable to join room! The room may not exist. Try creating a room with the CREATEROOM [roomname] command").encode("UTF-8") )
+                                else:
+                                     s.send( ("<" + self.clients[self.serverSocket] + "> You have successfully joined the room!").encode("UTF-8") )
 
                     except Exception as e:
                         #Disconnect client from server and remove from connected clients list
