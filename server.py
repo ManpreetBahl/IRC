@@ -131,6 +131,17 @@ class IRCServer(threading.Thread):
                                 else:
                                      s.send( ("<" + self.clients[self.serverSocket] + "> You have successfully joined the room!").encode("UTF-8") )
 
+                            """
+                            elif command == "LEAVEROOM":
+                                success = False
+                                #Find the room in the list of rooms
+                                for room in self.rooms:
+                                    if jsonData["roomname"] == room.name:
+                                        #Check if user is in the room:
+                                        for userSocket, userName in room.roomClients.items():
+                                            if userName == self.clients[s]:
+                                                del room.roomClients[userSocket]
+                            """
                     except Exception as e:
                         #Disconnect client from server and remove from connected clients list
                         print("ERROR: " + str(e))
