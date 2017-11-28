@@ -112,36 +112,49 @@ class IRCServer(threading.Thread):
                                     s.send( ("<" + self.clients[self.serverSocket] + "> Room created succesfully! You have been added to the room!").encode("UTF-8") )
 
                             elif command == "JOINROOM":
-                                success = False
+                                roomExists = False
                                 #Add the client to a room if it exists
                                 for room in self.rooms:
                                     if jsonData["roomname"] == room.name:
-                                        #Add user to the room if it exists
-                                        room.roomClients[s] = self.clients[s]
-                                        
-                                        #Notify other members in the room about new client joining
-                                        for userSocket in room.roomClients:
-                                            if userSocket != s:
-                                                userSocket.send( ("<" + room.name + "> " + self.clients[s] + " has joined the room!").encode("UTF-8") )
-                                        
-                                        success = True
-                                        break
-                                if success == False:
-                                    s.send( ("<" + self.clients[self.serverSocket] + "> Unable to join room! The room may not exist. Try creating a room with the CREATEROOM [roomname] command").encode("UTF-8") )
-                                else:
-                                     s.send( ("<" + self.clients[self.serverSocket] + "> You have successfully joined the room!").encode("UTF-8") )
+                                        #Check to make sure that user is not already in room:
+                                        if s not in room.roomClients:
+                                            #Add user to the room if it exists
+                                            room.roomClients[s] = self.clients[s]
 
-                            """
+                                            #Notify client that they have joined the room succesfully
+                                            s.send( ("<" + self.clients[self.serverSocket] + "> You have successfully joined the room!").encode("UTF-8") )
+
+                                             #Notify other members in the room about new client joining
+                                            for userSocket in room.roomClients:
+                                                if userSocket != s:
+                                                    userSocket.send( ("<" + room.name + "> " + self.clients[s] + " has joined the room!").encode("UTF-8") )
+                                        else:
+                                            s.send( ("<" + self.clients[self.serverSocket] + "> You are already in the room!").encode("UTF-8") )
+                                        roomExists = True
+                                        break
+                                
+                                #Notify client that the room doesn't exist!
+                                if roomExists == False:
+                                    s.send( ("<" + self.clients[self.serverSocket] + "> Unable to join room! The room may not exist. Try creating a room with the CREATEROOM [roomname] command").encode("UTF-8") )
+            
                             elif command == "LEAVEROOM":
-                                success = False
                                 #Find the room in the list of rooms
                                 for room in self.rooms:
                                     if jsonData["roomname"] == room.name:
-                                        #Check if user is in the room:
-                                        for userSocket, userName in room.roomClients.items():
-                                            if userName == self.clients[s]:
-                                                del room.roomClients[userSocket]
-                            """
+                                        #Attempt to remove client from the room
+                                        try:
+                                            del room.roomClients[s]
+                                            #Inform client that they have left the room successfully
+                                            s.send( ("<" + self.clients[self.serverSocket] + "> You have successfully left the room!").encode("UTF-8") )    
+                                            
+                                            #If there are no more clients in the room, delete the room
+                                            if len(room.roomClients) == 0:
+                                                self.rooms.remove(room)
+                                            
+                                            break
+                                        except KeyError: #Client is not in the room!
+                                            s.send( ("<" + self.clients[self.serverSocket] + "> Unable to leave room!").encode("UTF-8") ) 
+                                            break
                     except Exception as e:
                         #Disconnect client from server and remove from connected clients list
                         print("ERROR: " + str(e))
