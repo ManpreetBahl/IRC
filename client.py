@@ -51,6 +51,11 @@ class IRCClient():
         serverMsg["roomname"] = roomName
         self.server_connection.send((json.dumps(serverMsg)).encode("UTF-8"))
 
+    def listClients(self):
+        serverMsg = {}
+        serverMsg["command"] = "LISTCLIENTS"
+        self.server_connection.send((json.dumps(serverMsg)).encode("UTF-8"))
+
     def run(self):
         socket_list = [sys.stdin, self.server_connection]
         self.prompt()
@@ -86,6 +91,9 @@ class IRCClient():
                         roomName = message.split(" ", 1)[1]
                         self.leaveRoom(roomName)
 
+                    elif command == "LISTCLIENTS":
+                        self.listClients()
+
                     elif command == "QUIT":
                         print("Terminating program...")
                         self.server_connection.close()
@@ -98,84 +106,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
-"""
-print("Connecting to server...")
-server_connection = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-server_connection.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-server_connection.connect((CONSTANTS.HOST, CONSTANTS.PORT))
-print("Connected")
-
-printMenu()
-
-socket_list = [sys.stdin, server_connection]
-
-while True:
-    read, write, error = select.select(socket_list, [], [])
-    for s in read:
-        if s is server_connection:
-            # Get server response and display
-             message = s.recv(1024)
-             if not message:
-                 print("Server Down")
-                 sys.exit(1)
-             else:
-                 print("SERVER RESPONSE: " + message.decode())
-        else:
-            #printMenu()
-            printMenu()
-            choice = input("Enter your choice [1-2]: ")
-
-            if choice == "1": #Get a list of all rooms on IRC Server
-                serverMsg = {}
-                serverMsg["command"] = "LISTROOMS"
-                server_connection.sendall((json.dumps(serverMsg)).encode("UTF-8"))
-            elif choice == "2": 
-                print("Terminating program...")
-                server_connection.close()
-                sys.exit(0)
-        
-
-            #message = sys.stdin.readline()
-            #server_connection.sendall(message.encode())
-            """
-
-"""
-            serverMsg = {}
-            serverMsg["command"] = message.replace("\n", "")
-            print(serverMsg)
-            server_connection.sendall((json.dumps(serverMsg)).encode("UTF-8"))
-"""
-
-
-""" For Backup Purposes
-# client establishes connection to the server
-print("Connecting to server...\n")
-server_connection = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-server_connection.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-server_connection.connect((CONSTANTS.HOST, CONSTANTS.PORT))
-print("Connected.\n")
-
-socket_list = [sys.stdin, server_connection]
-
-while True:
-    read, write, error = select.select(socket_list, [], [])
-    for s in read:
-        if s is server_connection:
-            # Get server response and display
-             message = s.recv(1024)
-             if not message:
-                 print("Server Down")
-                 sys.exit(2)
-             else:
-                 sys.stdout.write(message.decode())
-        else:
-            message = sys.stdin.readline()
-            #server_connection.sendall(message.encode())
-
-            serverMsg = {}
-            serverMsg["command"] = message.replace("\n", "")
-            print(serverMsg)
-            server_connection.sendall((json.dumps(serverMsg)).encode("UTF-8"))
-"""

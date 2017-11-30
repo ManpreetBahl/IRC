@@ -90,7 +90,6 @@ class IRCServer(threading.Thread):
 
                             #Client wants to create a room
                             elif command == "CREATEROOM":
-                                
                                 allowCreate = True
                                 for room in self.rooms:
                                     if jsonData["roomname"] == room.name:
@@ -110,7 +109,8 @@ class IRCServer(threading.Thread):
 
                                     #Send message to client
                                     s.send( ("<" + self.clients[self.serverSocket] + "> Room created succesfully! You have been added to the room!").encode("UTF-8") )
-
+                            
+                            #Client wants to join a room
                             elif command == "JOINROOM":
                                 roomExists = False
                                 #Add the client to a room if it exists
@@ -137,6 +137,7 @@ class IRCServer(threading.Thread):
                                 if roomExists == False:
                                     s.send( ("<" + self.clients[self.serverSocket] + "> Unable to join room! The room may not exist. Try creating a room with the CREATEROOM [roomname] command").encode("UTF-8") )
             
+                            #Client wants to leave a room
                             elif command == "LEAVEROOM":
                                 #Find the room in the list of rooms
                                 for room in self.rooms:
@@ -155,6 +156,37 @@ class IRCServer(threading.Thread):
                                         except KeyError: #Client is not in the room!
                                             s.send( ("<" + self.clients[self.serverSocket] + "> Unable to leave room!").encode("UTF-8") ) 
                                             break
+
+                            #Client wants a list of clients connected to the server
+                            elif command == "LISTCLIENTS":
+                                if self.clients and not self.serverSocket in self.clients:
+                                    message = ""
+                                    for personSocket, person in self.clients.items():
+                                        if personSocket != s and personSocket != self.serverSocket:
+                                            message += "\n\t" + person
+
+                                    s.send( ("<" + self.clients[self.serverSocket] + "> Connected Clients:" + message).encode("UTF-8") )
+                                else:
+                                    #You are the only connected client on server
+                                    s.send( ("<" + self.clients[self.serverSocket] + "> You are all alone! Go invite more people to join!!").encode("UTF-8") )
+
+                            #Client wants to send a message to a room
+                            elif command == "MSGROOM":
+                                room = jsonData["room"]
+                                message = jsonData["message"]
+                                
+                                """
+                                #Search through rooms list
+                                if self.rooms:
+                                    for r in self.rooms:
+                                        #Found room
+                                        if r == room.name:
+                                            #Send messages to all others in the room
+                                            for userSocket in r.roomClients:
+                                                if userSocket != s:
+                                                    userSocket.send( ("<" + self.serverSocket + "> " + self.clients[s] + " in " + r.name + " says: " + message).encode("UTF-8") )
+                                """
+
                     except Exception as e:
                         #Disconnect client from server and remove from connected clients list
                         print("ERROR: " + str(e))
