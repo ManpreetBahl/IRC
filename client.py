@@ -55,6 +55,12 @@ class IRCClient():
         serverMsg["command"] = "LISTCLIENTS"
         self.server_connection.send((json.dumps(serverMsg)).encode("UTF-8"))
 
+    def listRoomClients(self, roomName):
+        serverMsg = {}
+        serverMsg["command"] = "LISTRMCLIENTS"
+        serverMsg["roomname"] = roomName
+        self.server_connection.send((json.dumps(serverMsg)).encode("UTF-8"))
+
     def msgRoom(self, roomName, message):
         serverMsg = {}
         serverMsg["command"] = "MSGROOM"
@@ -99,6 +105,10 @@ class IRCClient():
 
                     elif command == "LISTCLIENTS":
                         self.listClients()
+
+                    elif command == "LISTRMCLIENTS":
+                        roomName = message.split(" ", 1)[1]
+                        self.listRoomClients(roomName)
 
                     elif command == "MSGROOM":
                         parse = message.split(" ", 2)

@@ -194,16 +194,39 @@ class IRCServer(threading.Thread):
                             #Client wants a list of clients connected to the server
                             elif command == "LISTCLIENTS":
                                 self.lock.acquire()
-                                if self.clients and not self.serverSocket in self.clients:
+                                if self.clients:
                                     message = ""
                                     for personSocket, person in self.clients.items():
-                                        if personSocket != s and personSocket != self.serverSocket:
+                                        if personSocket != self.serverSocket:
                                             message += "\n\t" + person
 
                                     s.send( ("<" + self.clients[self.serverSocket] + "> Connected Clients:" + message).encode("UTF-8") )
                                 else:
                                     #You are the only connected client on server
                                     s.send( ("<" + self.clients[self.serverSocket] + "> You are all alone! Go invite more people to join!!").encode("UTF-8") )
+                                self.lock.release()
+
+                            #Client wants a list of clients in the room 
+                            elif command == "LISTRMCLIENTS":
+                                self.lock.acquire()
+                                room = jsonData["roomname"]
+                                success = False
+                                if self.rooms:
+                                    message = ""
+                                    #Find the room the get list of clients
+                                    for r in self.rooms:
+                                        if room == r.name:
+                                            #Get the list of clients in the room
+                                            for personSocket, person in r.roomClients.items():
+                                                if personSocket != self.serverSocket:
+                                                    message += "\n\t" + person
+                                            s.send( ("<" + self.clients[self.serverSocket] + "> Connected Clients in " + room + ":" + message).encode("UTF-8") )
+                                            success = True
+                                            break
+                                    if success == False:
+                                        s.send( ("<" + self.clients[self.serverSocket] + "> Nobody in the room").encode("UTF-8") )
+                                else:
+                                    s.send( ("<" + self.clients[self.serverSocket] + "> No rooms exist!").encode("UTF-8") )
                                 self.lock.release()
 
                             #Client wants to send a message to a room
