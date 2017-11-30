@@ -25,9 +25,8 @@ class IRCClient():
         print("Connected to Server!")
 
     def prompt(self):
-        sys.stdout.write("<" + self.name + "> ")
-        sys.stdout.flush()
- 
+        print("<" + self.name + "> ", end = '', flush=True)
+
     def listRooms(self):
         serverMsg = {}
         serverMsg["command"] = "LISTROOMS"
@@ -76,7 +75,7 @@ class IRCClient():
                         print("Server Down")
                         sys.exit(1)
                     else:
-                        print(message.decode())
+                        print("\n" + message.decode())
                         self.prompt()
 
                 elif s is sys.stdin:

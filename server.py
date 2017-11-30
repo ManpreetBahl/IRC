@@ -16,6 +16,7 @@ class IRCRoom():
 class IRCServer(threading.Thread):
     def __init__(self, host, port):
         threading.Thread.__init__(self)
+        self.lock = threading.Lock()
         self.host = host
         self.port = port
         #Dictionay containing all clients connected to the server. Key: Socket Object. Value: Client name associated with the socket object
@@ -23,6 +24,23 @@ class IRCServer(threading.Thread):
         #List containing all rooms on the server. Can also be a set. Decide later
         self.rooms = []
     
+    def cleanup(self, socket):
+        #Remove person from all rooms
+        for room in self.rooms:
+            #Go through all clients in a room
+            for personSocket in room.roomClients:
+                #Remove the client from the room, then check the next room
+                if personSocket == socket:
+                    del room.roomClients[personSocket]
+                    break
+            #Notify that the user has left the room 
+            for personSocket in room.roomClients:
+                if personSocket != socket:
+                    personSocket.send( ("<" + room.name + "> " + self.clients[socket] + " has left the room!").encode("UTF-8") )
+
+        #Remove client from list of clients
+        del self.clients[socket]
+
     def run(self):
         #Create and bind socket to host and port
         self.serverSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -30,12 +48,14 @@ class IRCServer(threading.Thread):
         self.serverSocket.bind((self.host, self.port))
 
         #Check if server socket is in the clients list or not
+        self.lock.acquire()
         if("SERVER" in self.clients):
             print("Server is alredy active and running!")
             sys.exit(1)
         else:
             #Add server socket to dictionary
             self.clients[self.serverSocket] = "SERVER"
+        self.lock.release()
 
         self.serverSocket.listen(1)
 
@@ -58,7 +78,9 @@ class IRCServer(threading.Thread):
                         clientSocket.send("You are already connected to the server!")
                     else:
                         # Add to list of all connected clients
+                        self.lock.acquire()
                         self.clients[clientSocket] = clientSocket
+                        self.lock.release()
                 else:
                     try:
                         data = s.recv(1024)
@@ -66,8 +88,13 @@ class IRCServer(threading.Thread):
 
                         if not data:
                             # Handles the unexpected connection closed by client
+                            print("Not data")
+                            
+                            self.lock.acquire()
+                            #Remove client from all rooms and then from list of connected clients
+                            self.cleanup(s)
+                            self.lock.release()
                             s.close()
-                            del self.clients[s]
                             print("Connection closed by client")
                         else:
                             jsonData = json.loads(str(data.decode('UTF-8')))
@@ -75,10 +102,13 @@ class IRCServer(threading.Thread):
 
                             # Associate client name to socket object
                             if command == "NICK":
+                                self.lock.acquire()
                                 self.clients[s] = jsonData["name"]
+                                self.lock.release()
 
                             #Client wants a list of all active rooms
                             elif command == "LISTROOMS":
+                                self.lock.acquire()
                                 if self.rooms:
                                     message = ""
                                     for room in self.rooms:
@@ -87,10 +117,12 @@ class IRCServer(threading.Thread):
                                     s.send( ("<" + self.clients[self.serverSocket] + "> Available Rooms:" + message).encode("UTF-8") )
                                 else:
                                     s.send( ("<" + self.clients[self.serverSocket] + "> No avaiable rooms").encode("UTF-8") )
+                                self.lock.release()
 
                             #Client wants to create a room
                             elif command == "CREATEROOM":
                                 allowCreate = True
+                                self.lock.acquire()
                                 for room in self.rooms:
                                     if jsonData["roomname"] == room.name:
                                         allowCreate = False
@@ -100,19 +132,18 @@ class IRCServer(threading.Thread):
                                 if allowCreate == True:
                                     #Create new room with the given room name
                                     newRoom = IRCRoom(jsonData["roomname"])                                   
-
                                     #Add the client to the room list
                                     newRoom.roomClients[s] = self.clients[s]
-                                    
                                     #Add room to list of rooms
                                     self.rooms.append(newRoom)
-
                                     #Send message to client
                                     s.send( ("<" + self.clients[self.serverSocket] + "> Room created succesfully! You have been added to the room!").encode("UTF-8") )
-                            
+                                self.lock.release()
+
                             #Client wants to join a room
                             elif command == "JOINROOM":
                                 roomExists = False
+                                self.lock.acquire()
                                 #Add the client to a room if it exists
                                 for room in self.rooms:
                                     if jsonData["roomname"] == room.name:
@@ -127,7 +158,7 @@ class IRCServer(threading.Thread):
                                              #Notify other members in the room about new client joining
                                             for userSocket in room.roomClients:
                                                 if userSocket != s:
-                                                    userSocket.send( ("<" + room.name + "> " + self.clients[s] + " has joined the room!").encode("UTF-8") )
+                                                    userSocket.send( ("<" + self.clients[self.serverSocket] + "> " + self.clients[s] + " has joined the room " + room.name + "!").encode("UTF-8") )
                                         else:
                                             s.send( ("<" + self.clients[self.serverSocket] + "> You are already in the room!").encode("UTF-8") )
                                         roomExists = True
@@ -136,9 +167,11 @@ class IRCServer(threading.Thread):
                                 #Notify client that the room doesn't exist!
                                 if roomExists == False:
                                     s.send( ("<" + self.clients[self.serverSocket] + "> Unable to join room! The room may not exist. Try creating a room with the CREATEROOM [roomname] command").encode("UTF-8") )
-            
+                                self.lock.release()
+
                             #Client wants to leave a room
                             elif command == "LEAVEROOM":
+                                self.lock.acquire()
                                 #Find the room in the list of rooms
                                 for room in self.rooms:
                                     if jsonData["roomname"] == room.name:
@@ -156,9 +189,11 @@ class IRCServer(threading.Thread):
                                         except KeyError: #Client is not in the room!
                                             s.send( ("<" + self.clients[self.serverSocket] + "> Unable to leave room!").encode("UTF-8") ) 
                                             break
+                                self.lock.release()
 
                             #Client wants a list of clients connected to the server
                             elif command == "LISTCLIENTS":
+                                self.lock.acquire()
                                 if self.clients and not self.serverSocket in self.clients:
                                     message = ""
                                     for personSocket, person in self.clients.items():
@@ -169,9 +204,12 @@ class IRCServer(threading.Thread):
                                 else:
                                     #You are the only connected client on server
                                     s.send( ("<" + self.clients[self.serverSocket] + "> You are all alone! Go invite more people to join!!").encode("UTF-8") )
+                                self.lock.release()
 
                             #Client wants to send a message to a room
                             elif command == "MSGROOM":
+                                self.lock.acquire()
+
                                 room = jsonData["roomname"]
                                 message = jsonData["message"]
                                 success = False
@@ -191,23 +229,19 @@ class IRCServer(threading.Thread):
                                                 break
                                 #Send client a message indicating that the room does not exist or they are not part of the indicated room
                                 if success == False:
-                                    s.send( ("<" + self.serverSocket + "> Unable to send message! The room does not exist or you are not part of the room!").encode("UTF-8")  )
+                                    s.send( ("<" + self.clients[self.serverSocket] + "> Unable to send message! The room does not exist or you are not part of the room!").encode("UTF-8")  )
+                                else:
+                                     s.send( ("<" + self.clients[self.serverSocket] + "> Message sent to room").encode("UTF-8")  )
+                                self.lock.release()
 
                     except Exception as e:
                         #Disconnect client from server and remove from connected clients list
                         print("ERROR: " + str(e))
                         s.close()
-                        del self.clients[s]
 
-                        #Remove person from all rooms
-                        for room in self.rooms:
-                            #Go through all clients in a room
-                            for personSocket in room.roomClients:
-                                #Remove the client from the room, then check the next room
-                                if personSocket == s:
-                                    del room.roomClients[personSocket]
-                                    break
-
+                        self.lock.acquire()
+                        self.cleanup(s)
+                        self.lock.release()
                         continue
 
         self.serverSocket.close() #Technically, unreachable code. Leaving it here for now
