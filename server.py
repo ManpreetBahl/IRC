@@ -172,20 +172,26 @@ class IRCServer(threading.Thread):
 
                             #Client wants to send a message to a room
                             elif command == "MSGROOM":
-                                room = jsonData["room"]
+                                room = jsonData["roomname"]
                                 message = jsonData["message"]
-                                
-                                """
+                                success = False
+
                                 #Search through rooms list
                                 if self.rooms:
                                     for r in self.rooms:
                                         #Found room
-                                        if r == room.name:
-                                            #Send messages to all others in the room
-                                            for userSocket in r.roomClients:
-                                                if userSocket != s:
-                                                    userSocket.send( ("<" + self.serverSocket + "> " + self.clients[s] + " in " + r.name + " says: " + message).encode("UTF-8") )
-                                """
+                                        if room == r.name:
+                                            #Check to make sure that the client is part of the room first
+                                            if s in r.roomClients:
+                                                #Send messages to all others in the room
+                                                for userSocket in r.roomClients.keys():
+                                                    if userSocket != s:
+                                                        userSocket.send( ("<" + self.clients[self.serverSocket] + "> " + self.clients[s] + " in " + r.name + " says: " + message).encode("UTF-8") )
+                                                success = True
+                                                break
+                                #Send client a message indicating that the room does not exist or they are not part of the indicated room
+                                if success == False:
+                                    s.send( ("<" + self.serverSocket + "> Unable to send message! The room does not exist or you are not part of the room!").encode("UTF-8")  )
 
                     except Exception as e:
                         #Disconnect client from server and remove from connected clients list
@@ -193,7 +199,14 @@ class IRCServer(threading.Thread):
                         s.close()
                         del self.clients[s]
 
-                        #TODO: Remove person from all rooms here
+                        #Remove person from all rooms
+                        for room in self.rooms:
+                            #Go through all clients in a room
+                            for personSocket in room.roomClients:
+                                #Remove the client from the room, then check the next room
+                                if personSocket == s:
+                                    del room.roomClients[personSocket]
+                                    break
 
                         continue
 
