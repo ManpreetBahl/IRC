@@ -269,8 +269,12 @@ class IRCServer(threading.Thread):
                                 message = jsonData["message"]
                                 if self.clients:
                                     for personSocket, person in self.clients.items():
-                                        if personSocket != self.serverSocket and person == target:
-                                            s.send( ("<" + self.clients[self.serverSocket] + "> " + self.clients[s] + " sent a message to you: " + message).encode("UTF-8") )
+                                        if personSocket != self.serverSocket and person == target and personSocket != s:
+                                            personSocket.send( ("<" + self.clients[self.serverSocket] + "> " + self.clients[s] + " sent a message to you: " + message).encode("UTF-8") )
+                                            s.send( ("<" + self.clients[self.serverSocket] + "> Private message sent to " + person).encode("UTF-8") )
+                                        if person == target and personSocket == s:
+                                            s.send( ("<" + self.clients[self.serverSocket] + "> Cannot send message to yourself!").encode("UTF-8") )
+                                            break
                                 else:
                                     #You are the only connected client on server
                                     s.send( ("<" + self.clients[self.serverSocket] + "> Unable to send private message! Nobody else is online!").encode("UTF-8") )

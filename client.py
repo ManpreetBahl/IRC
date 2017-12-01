@@ -23,7 +23,6 @@ class IRCClient():
         serverMsg["name"] = self.name
         self.server_connection.send((json.dumps(serverMsg)).encode("UTF-8"))
 
-        
         print("Connected to Server!")
 
     def prompt(self):
