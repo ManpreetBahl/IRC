@@ -103,7 +103,12 @@ class IRCServer(threading.Thread):
                             # Associate client name to socket object
                             if command == "NICK":
                                 self.lock.acquire()
-                                self.clients[s] = jsonData["name"]
+                                name = jsonData["name"]
+                                if name in self.clients.values():
+                                    s.send( ("<" + self.clients[self.serverSocket] + "> Name already in use!").encode("UTF-8") )
+                                else:
+                                    self.clients[s] = jsonData["name"]
+                                    s.send( ("<" + self.clients[self.serverSocket] + "> Connected to server under username: " + name).encode("UTF-8") )
                                 self.lock.release()
 
                             #Client wants a list of all active rooms
@@ -255,6 +260,20 @@ class IRCServer(threading.Thread):
                                     s.send( ("<" + self.clients[self.serverSocket] + "> Unable to send message! The room does not exist or you are not part of the room!").encode("UTF-8")  )
                                 else:
                                      s.send( ("<" + self.clients[self.serverSocket] + "> Message sent to room").encode("UTF-8")  )
+                                self.lock.release()
+
+                            #Client wants to send a private message to another client
+                            elif command == "PRIVMSG":
+                                self.lock.acquire()
+                                target = jsonData["target"]
+                                message = jsonData["message"]
+                                if self.clients:
+                                    for personSocket, person in self.clients.items():
+                                        if personSocket != self.serverSocket and person == target:
+                                            s.send( ("<" + self.clients[self.serverSocket] + "> " + self.clients[s] + " sent a message to you: " + message).encode("UTF-8") )
+                                else:
+                                    #You are the only connected client on server
+                                    s.send( ("<" + self.clients[self.serverSocket] + "> Unable to send private message! Nobody else is online!").encode("UTF-8") )
                                 self.lock.release()
 
                     except Exception as e:

@@ -13,7 +13,7 @@ def printMenu():
     print(66 * "-")
 
 class IRCClient():
-    def __init__(self, name):
+    def __init__(self,name):
         self.name = name
         self.server_connection = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.server_connection.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -22,6 +22,8 @@ class IRCClient():
         serverMsg["command"] = "NICK"
         serverMsg["name"] = self.name
         self.server_connection.send((json.dumps(serverMsg)).encode("UTF-8"))
+
+        
         print("Connected to Server!")
 
     def prompt(self):
@@ -65,6 +67,13 @@ class IRCClient():
         serverMsg = {}
         serverMsg["command"] = "MSGROOM"
         serverMsg["roomname"] = roomName
+        serverMsg["message"] = message
+        self.server_connection.send((json.dumps(serverMsg)).encode("UTF-8"))
+
+    def privateMsg(self, toMessage, message):
+        serverMsg = {}
+        serverMsg["command"] = "PRIVMSG"
+        serverMsg["target"] = toMessage
         serverMsg["message"] = message
         self.server_connection.send((json.dumps(serverMsg)).encode("UTF-8"))
 
@@ -113,6 +122,10 @@ class IRCClient():
                     elif command == "MSGROOM":
                         parse = message.split(" ", 2)
                         self.msgRoom(parse[1], parse[2])
+
+                    elif command == "PRIVMSG":
+                        parse = message.split(" ", 2)
+                        self.privateMsg(parse[1], parse[2])
 
                     elif command == "QUIT":
                         print("Terminating program...")
