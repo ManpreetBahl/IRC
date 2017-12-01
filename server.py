@@ -58,7 +58,6 @@ class IRCServer(threading.Thread):
         self.lock.release()
 
         self.serverSocket.listen(1)
-
         while True:
             try:
                 read, write, error = select.select(list(self.clients.keys()), [], [])
@@ -84,12 +83,10 @@ class IRCServer(threading.Thread):
                 else:
                     try:
                         data = s.recv(1024)
-                        print("Data Received: " + str(data.decode("UTF-8")))
+                        #print("Data Received: " + str(data.decode("UTF-8")))
 
                         if not data:
-                            # Handles the unexpected connection closed by client
-                            print("Not data")
-                            
+                            # Handles the unexpected connection closed by client                            
                             self.lock.acquire()
                             #Remove client from all rooms and then from list of connected clients
                             self.cleanup(s)
@@ -279,6 +276,10 @@ class IRCServer(threading.Thread):
                                     #You are the only connected client on server
                                     s.send( ("<" + self.clients[self.serverSocket] + "> Unable to send private message! Nobody else is online!").encode("UTF-8") )
                                 self.lock.release()
+
+                            #Client send an invalid command
+                            else:
+                                s.send( ("<" + self.clients[self.serverSocket] + "> Received invalid command! Please enter a valid command!").encode("UTF-8") )
 
                     except Exception as e:
                         #Disconnect client from server and remove from connected clients list

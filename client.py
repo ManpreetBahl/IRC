@@ -6,12 +6,6 @@ import CONSTANTS
 import json
 import os
 
-def printMenu():
-    print(30 * "-", "MENU", 30 * "-")
-    print("1. List IRC Rooms")
-    print("2. Exit")
-    print(66 * "-")
-
 class IRCClient():
     def __init__(self,name):
         self.name = name
@@ -85,9 +79,11 @@ class IRCClient():
                 if s is self.server_connection:
                     # Get server response and display
                     message = s.recv(1024)
+                    #No message so server is down
                     if not message:
                         print("Server Down")
                         sys.exit(1)
+                    #Print response from server and ask for client input
                     else:
                         print("\n" + message.decode())
                         self.prompt()
@@ -96,40 +92,54 @@ class IRCClient():
                     message = sys.stdin.readline().replace("\n", "")
                     command = message.split(" ", 1)[0]
 
+                    #Client wants a list of rooms
                     if command == "LISTROOMS":
                         self.listRooms()
 
+                    #Client wants to create a room
                     elif command == "CREATEROOM":
                         roomName = message.split(" ", 1)[1]
                         self.createRoom(roomName)
 
+                    #Client wants to join a room
                     elif command == "JOINROOM":
                         roomName = message.split(" ", 1)[1]
                         self.joinRoom(roomName)
 
+                    #Client wants to leave a room
                     elif command == "LEAVEROOM":
                         roomName = message.split(" ", 1)[1]
                         self.leaveRoom(roomName)
 
+                    #Client wants a list of all connected clients
                     elif command == "LISTCLIENTS":
                         self.listClients()
 
+                    #Client wants a list of clients in a particular room
                     elif command == "LISTRMCLIENTS":
                         roomName = message.split(" ", 1)[1]
                         self.listRoomClients(roomName)
 
+                    #Client wants to send a message to a room
                     elif command == "MSGROOM":
                         parse = message.split(" ", 2)
                         self.msgRoom(parse[1], parse[2])
 
+                    #Client wants to send a private message
                     elif command == "PRIVMSG":
                         parse = message.split(" ", 2)
                         self.privateMsg(parse[1], parse[2])
 
+                    #Client wants to terminate the program
                     elif command == "QUIT":
                         print("Terminating program...")
                         self.server_connection.close()
                         sys.exit(0)
+                    
+                    #Invalid command
+                    else:
+                        print("Invalid command! Please enter a valid command!")
+                        self.prompt()
 
 def main():
     name = input("Please enter your name: ")
