@@ -6,12 +6,6 @@ import CONSTANTS
 import json
 import os
 
-def printMenu():
-    print(30 * "-", "MENU", 30 * "-")
-    print("1. List IRC Rooms")
-    print("2. Exit")
-    print(66 * "-")
-
 class IRCClient():
     def __init__(self,name):
         self.name = name
@@ -100,6 +94,19 @@ class IRCClient():
             read_data = file_data.read(1024)
         file_data.close()
 
+    def receiveFileData(self, message, FILE_NAME, FILE_SIZE):
+        with open(self.name + '_' + FILE_NAME, 'wb') as f:
+            total_received_data = 0
+            while True:
+                f.write(message)
+                total_received_data += len(message)
+                if(total_received_data < FILE_SIZE):
+                    message = s.recv(1024)
+                else:
+                    break
+            f.close()
+        print("File: " + FILE_NAME + " received successfully")
+
 
     def run(self):
         socket_list = [sys.stdin, self.server_connection]
@@ -116,32 +123,35 @@ class IRCClient():
                 if s is self.server_connection:
                     # Get server response and display
                     message = s.recv(1024)
+
+                    #No message so server is down
                     if not message:
                         print("Server Down")
                         sys.exit(1)
                     else:
+                        # Sends file data when server is ready to recieve
                         if("RECEIVING FILE" in message.decode()):
                             self.sendFileData(message.decode().split(" ", 4)[3])
+
+                        # Switches to FILE_TRANSFER_MODE when server is sending a file
                         elif("SENDING FILE" in message.decode()):
                             FILE_TRANSFER_MODE = True
-                            FILE_NAME = message.decode().split(" ", 5)[3]
-                            FILE_SIZE = int(message.decode().split(" ", 5)[4])
-                        elif(FILE_TRANSFER_MODE):
-                            with open(self.name + '_' + FILE_NAME, 'wb') as f:
-                                total_received_data = 0
-                                while True:
-                                    f.write(message)
-                                    total_received_data += len(message)
-                                    if(total_received_data != FILE_SIZE):
-                                        message = s.recv(1024)
-                                    else:
-                                        break
-                                f.close()
+                            FILE_NAME = message.decode().split(" ", 10)[8]
+                            FILE_SIZE = int(message.decode().split(" ", 10)[9])
+                            display_msg = message.decode()
+                            display_msg = display_msg[:-len(str(FILE_SIZE))]
+                            print("\n" + display_msg)
 
+                        # Recieves file data and reset file parameters afterwards
+                        elif(FILE_TRANSFER_MODE):
+                            self.receiveFileData(message, FILE_NAME, FILE_SIZE)
+                            self.prompt()
                             # Resetting the file parameters
                             FILE_TRANSFER_MODE = False
                             FILE_NAME = None
                             FILE_SIZE = None
+
+                        # Print response from server and ask for client input
                         else:
                             print("\n" + message.decode())
                             self.prompt()
@@ -150,48 +160,64 @@ class IRCClient():
                     message = sys.stdin.readline().replace("\n", "")
                     command = message.split(" ", 1)[0]
 
+                    #Client wants a list of rooms
                     if command == "LISTROOMS":
                         self.listRooms()
 
+                    #Client wants to create a room
                     elif command == "CREATEROOM":
                         roomName = message.split(" ", 1)[1]
                         self.createRoom(roomName)
 
+                    #Client wants to join a room
                     elif command == "JOINROOM":
                         roomName = message.split(" ", 1)[1]
                         self.joinRoom(roomName)
 
+                    #Client wants to leave a room
                     elif command == "LEAVEROOM":
                         roomName = message.split(" ", 1)[1]
                         self.leaveRoom(roomName)
 
+                    #Client wants a list of all connected clients
                     elif command == "LISTCLIENTS":
                         self.listClients()
 
+                    #Client wants a list of clients in a particular room
                     elif command == "LISTRMCLIENTS":
                         roomName = message.split(" ", 1)[1]
                         self.listRoomClients(roomName)
 
+                    #Client wants to send a message to a room
                     elif command == "MSGROOM":
                         parse = message.split(" ", 2)
                         self.msgRoom(parse[1], parse[2])
 
+                    #Client wants to send a private message
                     elif command == "PRIVMSG":
                         parse = message.split(" ", 2)
                         self.privateMsg(parse[1], parse[2])
 
+                    #Client wants to send file to a room
                     elif command == "SENDFILEROOM":
                         parse = message.split(" ", 2)
                         self.sendFileRoom(parse[1], parse[2])
 
+                    #Client wants to send file to another client
                     elif command == "SENDFILEPRIV":
                         parse = message.split(" ", 2)
                         self.sendFilePriv(parse[1], parse[2])
 
+                    #Client wants to terminate the program
                     elif command == "QUIT":
                         print("Terminating program...")
                         self.server_connection.close()
                         sys.exit(0)
+
+                    #Invalid command
+                    else:
+                        print("Invalid command! Please enter a valid command!")
+                        self.prompt()
 
 def main():
     name = input("Please enter your name: ")

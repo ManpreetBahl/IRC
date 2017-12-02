@@ -63,7 +63,6 @@ class IRCServer(threading.Thread):
         self.lock.release()
 
         self.serverSocket.listen(1)
-
         while True:
             try:
                 read, write, error = select.select(list(self.clients.keys()), [], [])
@@ -89,38 +88,37 @@ class IRCServer(threading.Thread):
                 else:
                     try:
                         data = s.recv(1024)
-                        print("Data Received: " + str(data.decode("UTF-8")))
+                        #print("Data Received: " + str(data.decode("UTF-8")))
 
                         if not data:
                             # Handles the unexpected connection closed by client
-                            print("Not data")
-
                             self.lock.acquire()
                             #Remove client from all rooms and then from list of connected clients
+                            client_name = self.clients[s]
                             self.cleanup(s)
                             self.lock.release()
                             s.close()
-                            print("Connection closed by client")
+                            print("Connection closed by client: " + client_name)
 
-                        # Handles file transfer from client to server
+                        # Performs file transfer among client via server
                         elif(FILE_TRANSFER_MODE):
 
-                            client_list = []
                             total_received_data = 0
 
+                            # Transfers file data as it is recived to target client(s)
                             while True:
-                                # f.write(data)
+                                # Sending the received file data to target clients
                                 for client in FILE_CLIENT_LIST:
                                     client.send(data)
                                 total_received_data += len(data)
-                                if(total_received_data != FILE_SIZE):
+                                # Recieves file data fromt the sender client
+                                if(total_received_data < FILE_SIZE):
                                     data = s.recv(1024)
                                 else:
                                     break
 
-                            for client in FILE_CLIENT_LIST:
-                                client.send(("<" + self.clients[self.serverSocket] + "> " + self.clients[s] + " sent a file: " + FILE_NAME).encode("UTF-8"))
                             s.send( ("<" + self.clients[self.serverSocket] + "> File " + FILE_NAME + " sent succesfully!").encode("UTF-8") )
+
                             # Resetting the file parameters
                             FILE_TRANSFER_MODE = False
                             FILE_NAME = None
@@ -330,7 +328,7 @@ class IRCServer(threading.Thread):
                                                 #Send messages to all others in the room
                                                 for userSocket in r.roomClients.keys():
                                                     if userSocket != s:
-                                                        userSocket.send( ("<" + self.clients[self.serverSocket] + ">" + " SENDING FILE: " + FILE_NAME + " " + str(FILE_SIZE)).encode("UTF-8"))
+                                                        userSocket.send( ("<" + self.clients[self.serverSocket] + "> " + self.clients[s] + " in room " + target + " IS SENDING FILE: " + FILE_NAME + " " + str(FILE_SIZE)).encode("UTF-8"))
                                                         FILE_CLIENT_LIST.append(userSocket)
                                                 success = True
                                                 break
@@ -359,7 +357,7 @@ class IRCServer(threading.Thread):
                                         if personSocket != self.serverSocket and person == target and personSocket != s:
                                             FILE_CLIENT_LIST.append(personSocket)
                                             s.send(("<" + self.clients[self.serverSocket] + "> RECEIVING FILE: " + FILE_NAME).encode("UTF-8"))
-                                            personSocket.send( ("<" + self.clients[self.serverSocket] + ">" + " SENDING FILE: " + FILE_NAME + " " + str(FILE_SIZE)).encode("UTF-8"))
+                                            personSocket.send( ("<" + self.clients[self.serverSocket] + "> " + self.clients[s] + " (in private mode) is SENDING FILE: " + FILE_NAME + " " + str(FILE_SIZE)).encode("UTF-8"))
                                             success = True
                                         if person == target and personSocket == s:
                                             s.send( ("<" + self.clients[self.serverSocket] + "> Cannot send file to yourself!").encode("UTF-8") )
@@ -372,6 +370,10 @@ class IRCServer(threading.Thread):
                                     s.send( ("<" + self.clients[self.serverSocket] + "> Unable to send private file! Nobody else is online!").encode("UTF-8") )
                                 self.lock.release()
 
+                            #Client send an invalid command
+                            else:
+                                s.send( ("<" + self.clients[self.serverSocket] + "> Received invalid command! Please enter a valid command!").encode("UTF-8") )
+
                     except Exception as e:
                         #Disconnect client from server and remove from connected clients list
                         print("ERROR: " + str(e))
@@ -382,7 +384,7 @@ class IRCServer(threading.Thread):
                         self.lock.release()
                         continue
 
-        self.serverSocket.close() #Technically, unreachable code. Leaving it here for now
+        self.serverSocket.close() #Technically, unreachable code.
 
 def main():
     server = IRCServer(CONSTANTS.HOST, CONSTANTS.PORT)
