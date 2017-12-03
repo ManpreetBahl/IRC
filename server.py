@@ -5,6 +5,7 @@ import select
 import CONSTANTS
 import json
 from Crypto.Cipher import AES
+from Crypto import Random
 
 # Adds padding to data keep block size = FIXED_BLOCK_SIZE
 # which is must in AES
@@ -22,16 +23,19 @@ def strip_padding(data, interrupt, pad):
 
 # Pads, encodes, and then encrypt the data
 def encode_n_encrypt(data):
+    IV = Random.new().read(16) # randomly generated Initialization vector
     padded_data = add_padding(data, CONSTANTS.INTERRUPT, CONSTANTS.PAD, CONSTANTS.FIXED_BLOCK_SIZE)
     padded_data = padded_data.encode('UTF-8')
-    obj = AES.new(CONSTANTS.KEY, AES.MODE_CBC, CONSTANTS.IV)
+    obj = AES.new(CONSTANTS.KEY, AES.MODE_CFB, IV)
     ciphertext = obj.encrypt(padded_data)
-    return ciphertext
+    return IV+ciphertext
 
 # decrypts, decodes, and strips pads in data
 def decrypt_n_decode(data):
-    obj = AES.new(CONSTANTS.KEY, AES.MODE_CBC, CONSTANTS.IV)
-    decrypted_padded_data = obj.decrypt(data)
+    IV = data[:16] # extracts the Initialization Vector of size 16
+    ciphertext = data[16:] # extracts the ciphertext
+    obj = AES.new(CONSTANTS.KEY, AES.MODE_CFB, IV)
+    decrypted_padded_data = obj.decrypt(ciphertext)
     decrypted_padded_data = decrypted_padded_data.decode('UTF-8')
     decrypted_data = strip_padding(decrypted_padded_data, CONSTANTS.INTERRUPT, CONSTANTS.PAD)
     return decrypted_data
@@ -240,9 +244,11 @@ class IRCServer(threading.Thread):
                             #Client wants to leave a room
                             elif command == "LEAVEROOM":
                                 self.lock.acquire()
+                                room_found = False
                                 #Find the room in the list of rooms
                                 for room in self.rooms:
                                     if jsonData["roomname"] == room.name:
+                                        room_found = True
                                         #Attempt to remove client from the room
                                         try:
                                             del room.roomClients[s]
@@ -261,6 +267,9 @@ class IRCServer(threading.Thread):
                                         except KeyError: #Client is not in the room!
                                             s.send(encode_n_encrypt("<" + self.clients[self.serverSocket] + "> Unable to leave room!"))
                                             break
+                                if (not room_found):
+                                    s.send(encode_n_encrypt("<" + self.clients[self.serverSocket] + "> No room exists with name: " + jsonData["roomname"]))
+
                                 self.lock.release()
 
                             #Client wants a list of clients connected to the server
