@@ -67,7 +67,7 @@ class IRCServer(threading.Thread):
             #Notify that the user has left the room
             for personSocket in room.roomClients:
                 if personSocket != socket:
-                    personSocket.send(encode_n_encrypt("<" + room.name + "> " + self.clients[socket] + " has left the room!"))
+                    personSocket.send(encode_n_encrypt("<" + room.name + "> " + self.clients[socket] + " has left!"))
 
         #Remove client from list of clients
         del self.clients[socket]
@@ -252,6 +252,10 @@ class IRCServer(threading.Thread):
                                             #If there are no more clients in the room, delete the room
                                             if len(room.roomClients) == 0:
                                                 self.rooms.remove(room)
+                                            else:
+                                                #Notify other in room that the user has left the room
+                                                for personSocket in room.roomClients:
+                                                    personSocket.send(encode_n_encrypt("<" + self.clients[self.serverSocket] + "> " + self.clients[s] + " has left the room " + room.name + "!"))
 
                                             break
                                         except KeyError: #Client is not in the room!
