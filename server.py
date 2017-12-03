@@ -4,6 +4,37 @@ import threading
 import select
 import CONSTANTS
 import json
+from Crypto.Cipher import AES
+
+# Adds padding to data keep block size = FIXED_BLOCK_SIZE
+# which is must in AES
+def add_padding(data, interrupt, pad, block_size):
+    new_data = ''.join([data, interrupt])
+    new_data_len = len(new_data)
+    remaining_len = block_size - new_data_len
+    to_pad_len = remaining_len % block_size
+    pad_string = pad * to_pad_len
+    return ''.join([new_data, pad_string])
+
+# Removes extra padding added while AES encryption
+def strip_padding(data, interrupt, pad):
+    return data.rstrip(pad).rstrip(interrupt)
+
+# Pads, encodes, and then encrypt the data
+def encode_n_encrypt(data):
+    padded_data = add_padding(data, CONSTANTS.INTERRUPT, CONSTANTS.PAD, CONSTANTS.FIXED_BLOCK_SIZE)
+    padded_data = padded_data.encode('UTF-8')
+    obj = AES.new(CONSTANTS.KEY, AES.MODE_CBC, CONSTANTS.IV)
+    ciphertext = obj.encrypt(padded_data)
+    return ciphertext
+
+# decrypts, decodes, and strips pads in data
+def decrypt_n_decode(data):
+    obj = AES.new(CONSTANTS.KEY, AES.MODE_CBC, CONSTANTS.IV)
+    decrypted_padded_data = obj.decrypt(data)
+    decrypted_padded_data = decrypted_padded_data.decode('UTF-8')
+    decrypted_data = strip_padding(decrypted_padded_data, CONSTANTS.INTERRUPT, CONSTANTS.PAD)
+    return decrypted_data
 
 #Defines an IRC Room
 class IRCRoom():
@@ -36,7 +67,7 @@ class IRCServer(threading.Thread):
             #Notify that the user has left the room
             for personSocket in room.roomClients:
                 if personSocket != socket:
-                    personSocket.send( ("<" + room.name + "> " + self.clients[socket] + " has left the room!").encode("UTF-8") )
+                    personSocket.send(encode_n_encrypt("<" + room.name + "> " + self.clients[socket] + " has left the room!"))
 
         #Remove client from list of clients
         del self.clients[socket]
@@ -79,7 +110,7 @@ class IRCServer(threading.Thread):
                         break
                     #If client is already connected to the server, send an appropriate message
                     if(clientSocket in self.clients):
-                        clientSocket.send("You are already connected to the server!")
+                        clientSocket.send(encode_n_encrypt("You are already connected to the server!"))
                     else:
                         # Add to list of all connected clients
                         self.lock.acquire()
@@ -88,7 +119,9 @@ class IRCServer(threading.Thread):
                 else:
                     try:
                         data = s.recv(1024)
-                        #print("Data Received: " + str(data.decode("UTF-8")))
+                        print("Data Received (Encrypted): " + str(data))
+                        print("\nData Received (Decrypted): " + str(decrypt_n_decode(data)))
+                        data = decrypt_n_decode(data)
 
                         if not data:
                             # Handles the unexpected connection closed by client
@@ -109,15 +142,16 @@ class IRCServer(threading.Thread):
                             while True:
                                 # Sending the received file data to target clients
                                 for client in FILE_CLIENT_LIST:
-                                    client.send(data)
+                                    client.send(encode_n_encrypt(data))
                                 total_received_data += len(data)
                                 # Recieves file data fromt the sender client
                                 if(total_received_data < FILE_SIZE):
                                     data = s.recv(1024)
+                                    data = decrypt_n_decode(data)
                                 else:
                                     break
 
-                            s.send( ("<" + self.clients[self.serverSocket] + "> File " + FILE_NAME + " sent succesfully!").encode("UTF-8") )
+                            s.send(encode_n_encrypt("<" + self.clients[self.serverSocket] + "> File " + FILE_NAME + " sent succesfully!"))
 
                             # Resetting the file parameters
                             FILE_TRANSFER_MODE = False
@@ -126,7 +160,7 @@ class IRCServer(threading.Thread):
                             FILE_CLIENT_LIST = []
 
                         else:
-                            jsonData = json.loads(str(data.decode('UTF-8')))
+                            jsonData = json.loads(str(data))
                             command = jsonData["command"]
 
                             # Associate client name to socket object
@@ -134,10 +168,10 @@ class IRCServer(threading.Thread):
                                 self.lock.acquire()
                                 name = jsonData["name"]
                                 if name in self.clients.values():
-                                    s.send( ("<" + self.clients[self.serverSocket] + "> Name already in use!").encode("UTF-8") )
+                                    s.send(encode_n_encrypt("<" + self.clients[self.serverSocket] + "> Name already in use!"))
                                 else:
                                     self.clients[s] = jsonData["name"]
-                                    s.send( ("<" + self.clients[self.serverSocket] + "> Connected to server under username: " + name).encode("UTF-8") )
+                                    s.send(encode_n_encrypt("<" + self.clients[self.serverSocket] + "> Connected to server under username: " + name))
                                 self.lock.release()
 
                             #Client wants a list of all active rooms
@@ -148,9 +182,9 @@ class IRCServer(threading.Thread):
                                     for room in self.rooms:
                                         message += "\n\t" + room.name
 
-                                    s.send( ("<" + self.clients[self.serverSocket] + "> Available Rooms:" + message).encode("UTF-8") )
+                                    s.send(encode_n_encrypt("<" + self.clients[self.serverSocket] + "> Available Rooms:" + message))
                                 else:
-                                    s.send( ("<" + self.clients[self.serverSocket] + "> No avaiable rooms").encode("UTF-8") )
+                                    s.send(encode_n_encrypt("<" + self.clients[self.serverSocket] + "> No avaiable rooms"))
                                 self.lock.release()
 
                             #Client wants to create a room
@@ -160,7 +194,7 @@ class IRCServer(threading.Thread):
                                 for room in self.rooms:
                                     if jsonData["roomname"] == room.name:
                                         allowCreate = False
-                                        s.send( ("<" + self.clients[self.serverSocket] + "> Room name already taken! Please enter a different room name!").encode("UTF-8") )
+                                        s.send(encode_n_encrypt("<" + self.clients[self.serverSocket] + "> Room name already taken! Please enter a different room name!"))
                                         break
 
                                 if allowCreate == True:
@@ -171,7 +205,7 @@ class IRCServer(threading.Thread):
                                     #Add room to list of rooms
                                     self.rooms.append(newRoom)
                                     #Send message to client
-                                    s.send( ("<" + self.clients[self.serverSocket] + "> Room created succesfully! You have been added to the room!").encode("UTF-8") )
+                                    s.send(encode_n_encrypt("<" + self.clients[self.serverSocket] + "> Room created succesfully! You have been added to the room!"))
                                 self.lock.release()
 
                             #Client wants to join a room
@@ -187,20 +221,20 @@ class IRCServer(threading.Thread):
                                             room.roomClients[s] = self.clients[s]
 
                                             #Notify client that they have joined the room succesfully
-                                            s.send( ("<" + self.clients[self.serverSocket] + "> You have successfully joined the room!").encode("UTF-8") )
+                                            s.send(encode_n_encrypt("<" + self.clients[self.serverSocket] + "> You have successfully joined the room!"))
 
                                              #Notify other members in the room about new client joining
                                             for userSocket in room.roomClients:
                                                 if userSocket != s:
-                                                    userSocket.send( ("<" + self.clients[self.serverSocket] + "> " + self.clients[s] + " has joined the room " + room.name + "!").encode("UTF-8") )
+                                                    userSocket.send(encode_n_encrypt("<" + self.clients[self.serverSocket] + "> " + self.clients[s] + " has joined the room " + room.name + "!"))
                                         else:
-                                            s.send( ("<" + self.clients[self.serverSocket] + "> You are already in the room!").encode("UTF-8") )
+                                            s.send(encode_n_encrypt("<" + self.clients[self.serverSocket] + "> You are already in the room!"))
                                         roomExists = True
                                         break
 
                                 #Notify client that the room doesn't exist!
                                 if roomExists == False:
-                                    s.send( ("<" + self.clients[self.serverSocket] + "> Unable to join room! The room may not exist. Try creating a room with the CREATEROOM [roomname] command").encode("UTF-8") )
+                                    s.send(encode_n_encrypt("<" + self.clients[self.serverSocket] + "> Unable to join room! The room may not exist. Try creating a room with the CREATEROOM [roomname] command"))
                                 self.lock.release()
 
                             #Client wants to leave a room
@@ -213,7 +247,7 @@ class IRCServer(threading.Thread):
                                         try:
                                             del room.roomClients[s]
                                             #Inform client that they have left the room successfully
-                                            s.send( ("<" + self.clients[self.serverSocket] + "> You have successfully left the room!").encode("UTF-8") )
+                                            s.send(encode_n_encrypt("<" + self.clients[self.serverSocket] + "> You have successfully left the room!"))
 
                                             #If there are no more clients in the room, delete the room
                                             if len(room.roomClients) == 0:
@@ -221,7 +255,7 @@ class IRCServer(threading.Thread):
 
                                             break
                                         except KeyError: #Client is not in the room!
-                                            s.send( ("<" + self.clients[self.serverSocket] + "> Unable to leave room!").encode("UTF-8") )
+                                            s.send(encode_n_encrypt("<" + self.clients[self.serverSocket] + "> Unable to leave room!"))
                                             break
                                 self.lock.release()
 
@@ -234,10 +268,10 @@ class IRCServer(threading.Thread):
                                         if personSocket != self.serverSocket:
                                             message += "\n\t" + person
 
-                                    s.send( ("<" + self.clients[self.serverSocket] + "> Connected Clients:" + message).encode("UTF-8") )
+                                    s.send(encode_n_encrypt("<" + self.clients[self.serverSocket] + "> Connected Clients:" + message))
                                 else:
                                     #You are the only connected client on server
-                                    s.send( ("<" + self.clients[self.serverSocket] + "> You are all alone! Go invite more people to join!!").encode("UTF-8") )
+                                    s.send(encode_n_encrypt("<" + self.clients[self.serverSocket] + "> You are all alone! Go invite more people to join!!"))
                                 self.lock.release()
 
                             #Client wants a list of clients in the room
@@ -254,13 +288,13 @@ class IRCServer(threading.Thread):
                                             for personSocket, person in r.roomClients.items():
                                                 if personSocket != self.serverSocket:
                                                     message += "\n\t" + person
-                                            s.send( ("<" + self.clients[self.serverSocket] + "> Connected Clients in " + room + ":" + message).encode("UTF-8") )
+                                            s.send(encode_n_encrypt("<" + self.clients[self.serverSocket] + "> Connected Clients in " + room + ":" + message))
                                             success = True
                                             break
                                     if success == False:
-                                        s.send( ("<" + self.clients[self.serverSocket] + "> Nobody in the room").encode("UTF-8") )
+                                        s.send(encode_n_encrypt("<" + self.clients[self.serverSocket] + "> Nobody in the room"))
                                 else:
-                                    s.send( ("<" + self.clients[self.serverSocket] + "> No rooms exist!").encode("UTF-8") )
+                                    s.send(encode_n_encrypt("<" + self.clients[self.serverSocket] + "> No rooms exist!"))
                                 self.lock.release()
 
                             #Client wants to send a message to a room
@@ -281,14 +315,14 @@ class IRCServer(threading.Thread):
                                                 #Send messages to all others in the room
                                                 for userSocket in r.roomClients.keys():
                                                     if userSocket != s:
-                                                        userSocket.send( ("<" + self.clients[self.serverSocket] + "> " + self.clients[s] + " in " + r.name + " says: " + message).encode("UTF-8") )
+                                                        userSocket.send(encode_n_encrypt("<" + self.clients[self.serverSocket] + "> " + self.clients[s] + " in " + r.name + " says: " + message))
                                                 success = True
                                                 break
                                 #Send client a message indicating that the room does not exist or they are not part of the indicated room
                                 if success == False:
-                                    s.send( ("<" + self.clients[self.serverSocket] + "> Unable to send message! The room does not exist or you are not part of the room!").encode("UTF-8")  )
+                                    s.send(encode_n_encrypt("<" + self.clients[self.serverSocket] + "> Unable to send message! The room does not exist or you are not part of the room!") )
                                 else:
-                                     s.send( ("<" + self.clients[self.serverSocket] + "> Message sent to room").encode("UTF-8")  )
+                                     s.send(encode_n_encrypt("<" + self.clients[self.serverSocket] + "> Message sent to room") )
                                 self.lock.release()
 
                             # Client wants to send a private message to another client
@@ -299,14 +333,14 @@ class IRCServer(threading.Thread):
                                 if self.clients:
                                     for personSocket, person in self.clients.items():
                                         if personSocket != self.serverSocket and person == target and personSocket != s:
-                                            personSocket.send( ("<" + self.clients[self.serverSocket] + "> " + self.clients[s] + " sent a message to you: " + message).encode("UTF-8") )
-                                            s.send( ("<" + self.clients[self.serverSocket] + "> Private message sent to " + person).encode("UTF-8") )
+                                            personSocket.send(encode_n_encrypt("<" + self.clients[self.serverSocket] + "> " + self.clients[s] + " sent a message to you: " + message))
+                                            s.send(encode_n_encrypt("<" + self.clients[self.serverSocket] + "> Private message sent to " + person))
                                         if person == target and personSocket == s:
-                                            s.send( ("<" + self.clients[self.serverSocket] + "> Cannot send message to yourself!").encode("UTF-8") )
+                                            s.send(encode_n_encrypt("<" + self.clients[self.serverSocket] + "> Cannot send message to yourself!"))
                                             break
                                 else:
                                     #You are the only connected client on server
-                                    s.send( ("<" + self.clients[self.serverSocket] + "> Unable to send private message! Nobody else is online!").encode("UTF-8") )
+                                    s.send(encode_n_encrypt("<" + self.clients[self.serverSocket] + "> Unable to send private message! Nobody else is online!"))
                                 self.lock.release()
 
                             # Client wants to send a file to a room
@@ -328,17 +362,17 @@ class IRCServer(threading.Thread):
                                                 #Send messages to all others in the room
                                                 for userSocket in r.roomClients.keys():
                                                     if userSocket != s:
-                                                        userSocket.send( ("<" + self.clients[self.serverSocket] + "> " + self.clients[s] + " in room " + target + " IS SENDING FILE: " + FILE_NAME + " " + str(FILE_SIZE)).encode("UTF-8"))
+                                                        userSocket.send(encode_n_encrypt("<" + self.clients[self.serverSocket] + "> " + self.clients[s] + " in room " + target + " IS SENDING FILE: " + FILE_NAME + " " + str(FILE_SIZE)))
                                                         FILE_CLIENT_LIST.append(userSocket)
                                                 success = True
                                                 break
 
                                 # Send client a message indicating that the room does not exist or they are not part of the indicated room
                                 if success == False:
-                                    s.send( ("<" + self.clients[self.serverSocket] + "> Unable to send file! The room does not exist or you are not part of the room!").encode("UTF-8")  )
+                                    s.send(encode_n_encrypt("<" + self.clients[self.serverSocket] + "> Unable to send file! The room does not exist or you are not part of the room!") )
                                 # Send client message to start the file transfer
                                 else:
-                                    s.send(("<" + self.clients[self.serverSocket] + "> RECEIVING FILE: " + FILE_NAME).encode("UTF-8"))
+                                    s.send(encode_n_encrypt(("<" + self.clients[self.serverSocket] + "> RECEIVING FILE: " + FILE_NAME)))
 
                                 self.lock.release()
 
@@ -356,23 +390,23 @@ class IRCServer(threading.Thread):
                                     for personSocket, person in self.clients.items():
                                         if personSocket != self.serverSocket and person == target and personSocket != s:
                                             FILE_CLIENT_LIST.append(personSocket)
-                                            s.send(("<" + self.clients[self.serverSocket] + "> RECEIVING FILE: " + FILE_NAME).encode("UTF-8"))
-                                            personSocket.send( ("<" + self.clients[self.serverSocket] + "> " + self.clients[s] + " (in private mode) is SENDING FILE: " + FILE_NAME + " " + str(FILE_SIZE)).encode("UTF-8"))
+                                            s.send(encode_n_encrypt(("<" + self.clients[self.serverSocket] + "> RECEIVING FILE: " + FILE_NAME)))
+                                            personSocket.send(encode_n_encrypt("<" + self.clients[self.serverSocket] + "> " + self.clients[s] + " (in private mode) is SENDING FILE: " + FILE_NAME + " " + str(FILE_SIZE)))
                                             success = True
                                         if person == target and personSocket == s:
-                                            s.send( ("<" + self.clients[self.serverSocket] + "> Cannot send file to yourself!").encode("UTF-8") )
+                                            s.send(encode_n_encrypt("<" + self.clients[self.serverSocket] + "> Cannot send file to yourself!"))
                                             success = True
                                             break
                                     if success == False:
-                                            s.send( ("<" + self.clients[self.serverSocket] + "> Unable to send private file! Nobody is online with name: " + target).encode("UTF-8") )
+                                            s.send(encode_n_encrypt("<" + self.clients[self.serverSocket] + "> Unable to send private file! Nobody is online with name: " + target))
                                 else:
                                     #You are the only connected client on server
-                                    s.send( ("<" + self.clients[self.serverSocket] + "> Unable to send private file! Nobody else is online!").encode("UTF-8") )
+                                    s.send(encode_n_encrypt("<" + self.clients[self.serverSocket] + "> Unable to send private file! Nobody else is online!"))
                                 self.lock.release()
 
                             #Client send an invalid command
                             else:
-                                s.send( ("<" + self.clients[self.serverSocket] + "> Received invalid command! Please enter a valid command!").encode("UTF-8") )
+                                s.send(encode_n_encrypt("<" + self.clients[self.serverSocket] + "> Received invalid command! Please enter a valid command!"))
 
                     except Exception as e:
                         #Disconnect client from server and remove from connected clients list
