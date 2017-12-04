@@ -23,6 +23,11 @@ def strip_padding(data, interrupt, pad):
 
 # Pads, encodes, and then encrypt the data
 def encode_n_encrypt(data):
+    # converts to JSON
+    client_msg = {}
+    client_msg["message"] = data
+    data = json.dumps(client_msg)
+
     IV = Random.new().read(16) # randomly generated Initialization vector
     padded_data = add_padding(data, CONSTANTS.INTERRUPT, CONSTANTS.PAD, CONSTANTS.FIXED_BLOCK_SIZE)
     padded_data = padded_data.encode('UTF-8')

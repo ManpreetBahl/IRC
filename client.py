@@ -39,6 +39,10 @@ def decrypt_n_decode(data):
     decrypted_padded_data = obj.decrypt(ciphertext)
     decrypted_padded_data = decrypted_padded_data.decode('UTF-8')
     decrypted_data = strip_padding(decrypted_padded_data, CONSTANTS.INTERRUPT, CONSTANTS.PAD)
+    # reads from JSON
+    jsonData = json.loads(str(decrypted_data))
+    decrypted_data = jsonData["message"]
+
     return decrypted_data
 
 class IRCClient():
