@@ -39,7 +39,7 @@ deactivate () {
 # unset irrelevant variables
 deactivate nondestructive
 
-VIRTUAL_ENV="/mnt/c/Users/Manpreet/Documents/Computer Science/CS594- Internetworking Protocols/irc/venv"
+VIRTUAL_ENV="/mnt/c/Users/Manpreet/Documents/computerscience/CS594/irc/venv"
 export VIRTUAL_ENV
 
 _OLD_VIRTUAL_PATH="$PATH"

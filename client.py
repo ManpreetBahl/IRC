@@ -114,8 +114,12 @@ class IRCClient():
         serverMsg["command"] = "SENDFILEROOM"
         serverMsg["target"] = target
         serverMsg["file_name"] = file_name
-        serverMsg["file_size"] = os.stat(file_name).st_size
-        self.server_connection.send(encode_n_encrypt(json.dumps(serverMsg)))
+        if(os.path.isfile(file_name)):
+            serverMsg["file_size"] = os.stat(file_name).st_size
+            self.server_connection.send(encode_n_encrypt(json.dumps(serverMsg)))
+        else:
+            print("File: '" + file_name + "'' doesn't exist. Please check!")
+            self.prompt()
 
     def sendFilePriv(self, target, file_name):
         serverMsg = {}
@@ -204,66 +208,72 @@ class IRCClient():
 
                 elif s is sys.stdin:
                     message = sys.stdin.readline().replace("\n", "")
-                    command = message.split(" ", 1)[0]
+                    try:
+                        command = message.split(" ", 1)[0]
 
-                    #Client wants a list of rooms
-                    if command == "LISTROOMS":
-                        self.listRooms()
+                        #Client wants a list of rooms
+                        if command == "LISTROOMS":
+                            self.listRooms()
 
-                    #Client wants to create a room
-                    elif command == "CREATEROOM":
-                        roomName = message.split(" ", 1)[1]
-                        self.createRoom(roomName)
+                        #Client wants to create a room
+                        elif command == "CREATEROOM":
+                            roomName = message.split(" ", 1)[1]
+                            self.createRoom(roomName)
 
-                    #Client wants to join a room
-                    elif command == "JOINROOM":
-                        roomName = message.split(" ", 1)[1]
-                        self.joinRoom(roomName)
+                        #Client wants to join a room
+                        elif command == "JOINROOM":
+                            roomName = message.split(" ", 1)[1]
+                            self.joinRoom(roomName)
 
-                    #Client wants to leave a room
-                    elif command == "LEAVEROOM":
-                        roomName = message.split(" ", 1)[1]
-                        self.leaveRoom(roomName)
+                        #Client wants to leave a room
+                        elif command == "LEAVEROOM":
+                            roomName = message.split(" ", 1)[1]
+                            self.leaveRoom(roomName)
 
-                    #Client wants a list of all connected clients
-                    elif command == "LISTCLIENTS":
-                        self.listClients()
+                        #Client wants a list of all connected clients
+                        elif command == "LISTCLIENTS":
+                            self.listClients()
 
-                    #Client wants a list of clients in a particular room
-                    elif command == "LISTRMCLIENTS":
-                        roomName = message.split(" ", 1)[1]
-                        self.listRoomClients(roomName)
+                        #Client wants a list of clients in a particular room
+                        elif command == "LISTRMCLIENTS":
+                            roomName = message.split(" ", 1)[1]
+                            self.listRoomClients(roomName)
 
-                    #Client wants to send a message to a room
-                    elif command == "MSGROOM":
-                        parse = message.split(" ", 2)
-                        self.msgRoom(parse[1], parse[2])
+                        #Client wants to send a message to a room
+                        elif command == "MSGROOM":
+                            parse = message.split(" ", 2)
+                            self.msgRoom(parse[1], parse[2])
 
-                    #Client wants to send a private message
-                    elif command == "PRIVMSG":
-                        parse = message.split(" ", 2)
-                        self.privateMsg(parse[1], parse[2])
+                        #Client wants to send a private message
+                        elif command == "PRIVMSG":
+                            parse = message.split(" ", 2)
+                            self.privateMsg(parse[1], parse[2])
 
-                    #Client wants to send file to a room
-                    elif command == "SENDFILEROOM":
-                        parse = message.split(" ", 2)
-                        self.sendFileRoom(parse[1], parse[2])
+                        #Client wants to send file to a room
+                        elif command == "SENDFILEROOM":
+                            parse = message.split(" ", 2)
+                            self.sendFileRoom(parse[1], parse[2])
 
-                    #Client wants to send file to another client
-                    elif command == "SENDFILEPRIV":
-                        parse = message.split(" ", 2)
-                        self.sendFilePriv(parse[1], parse[2])
+                        #Client wants to send file to another client
+                        elif command == "SENDFILEPRIV":
+                            parse = message.split(" ", 2)
+                            self.sendFilePriv(parse[1], parse[2])
 
-                    #Client wants to terminate the program
-                    elif command == "QUIT":
-                        print("Terminating program...")
-                        self.server_connection.close()
-                        sys.exit(0)
+                        #Client wants to terminate the program
+                        elif command == "QUIT":
+                            print("Terminating program...")
+                            self.server_connection.close()
+                            sys.exit(0)
 
-                    #Invalid command
-                    else:
-                        print("Invalid command! Please enter a valid command!")
+                        #Invalid command
+                        else:
+                            print("Invalid command! Please enter a valid command!")
+                            self.prompt()
+                            
+                    except IndexError as ie:
+                        print("Command received too few arguments! Please try again!")
                         self.prompt()
+                        continue
 
 def main():
     name = input("Please enter your name: ")
