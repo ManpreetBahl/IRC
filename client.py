@@ -163,13 +163,13 @@ class IRCClient():
                 if s is self.server_connection:
                     # Get server response and display
                     message = s.recv(1024)
-                    message = decrypt_n_decode(message)
 
                     #No message so server is down
                     if not message:
                         print("Server Down")
                         sys.exit(1)
                     else:
+                        message = decrypt_n_decode(message)
                         # Sends file data when server is ready to recieve
                         if("RECEIVING FILE" in message):
                             self.sendFileData(message.split(" ", 4)[3])

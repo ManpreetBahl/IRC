@@ -128,9 +128,10 @@ class IRCServer(threading.Thread):
                 else:
                     try:
                         data = s.recv(1024)
+
                         print("Data Received (Encrypted): " + str(data))
-                        print("\nData Received (Decrypted): " + str(decrypt_n_decode(data)))
-                        data = decrypt_n_decode(data)
+                        if data:
+                            print("\nData Received (Decrypted): " + str(decrypt_n_decode(data)))
 
                         if not data:
                             # Handles the unexpected connection closed by client
@@ -144,7 +145,7 @@ class IRCServer(threading.Thread):
 
                         # Performs file transfer among client via server
                         elif(FILE_TRANSFER_MODE):
-
+                            data = decrypt_n_decode(data)
                             total_received_data = 0
 
                             # Transfers file data as it is recived to target client(s)
@@ -169,6 +170,7 @@ class IRCServer(threading.Thread):
                             FILE_CLIENT_LIST = []
 
                         else:
+                            data = decrypt_n_decode(data)
                             jsonData = json.loads(str(data))
                             command = jsonData["command"]
 
