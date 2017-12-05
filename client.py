@@ -122,16 +122,21 @@ class IRCClient():
         serverMsg["command"] = "SENDFILEPRIV"
         serverMsg["target"] = target
         serverMsg["file_name"] = file_name
-        serverMsg["file_size"] = os.stat(file_name).st_size
-        self.server_connection.send(encode_n_encrypt(json.dumps(serverMsg)))
+        if(os.path.isfile(file_name)):
+            serverMsg["file_size"] = os.stat(file_name).st_size
+            self.server_connection.send(encode_n_encrypt(json.dumps(serverMsg)))
+        else:
+            print("File: '" + file_name + "'' doesn't exist. Please check!")
+            self.prompt()
 
     def sendFileData(self, file_name):
-        file_data = open(file_name)
-        read_data = file_data.read(1024)
-        while read_data:
-            self.server_connection.send(encode_n_encrypt(read_data))
+        # file_data = open(file_name)
+        with open(file_name) as file_data:
             read_data = file_data.read(1024)
-        file_data.close()
+            while read_data:
+                self.server_connection.send(encode_n_encrypt(read_data))
+                read_data = file_data.read(1024)
+            file_data.close()
 
     def receiveFileData(self, message, FILE_NAME, FILE_SIZE):
         with open(self.name + '_' + FILE_NAME, 'wb') as f:
