@@ -18,7 +18,7 @@ from Crypto import Random
 
 #########################################################################
 # Encryption Functions for Secure Messaging
-
+#########################################################################
 # Adds padding to data keep block size = FIXED_BLOCK_SIZE
 def add_padding(data, interrupt, pad, block_size):
     new_data = ''.join([data, interrupt])
