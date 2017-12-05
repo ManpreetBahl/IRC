@@ -60,6 +60,7 @@ def decrypt_n_decode(data):
 # IRC Client Object
 # This class defines an IRC client and what the client is able to do 
 # when connected to the server
+#########################################################################
 class IRCClient():
     # Initializes variables, establishes a connection to the server, and registers the client with the provided name
     def __init__(self,name):
